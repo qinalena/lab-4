@@ -29,6 +29,7 @@ public class MongoGradeDataBase implements GradeDataBase {
     private static final String TOKEN = "token";
     // load getPassword() from env variable.
     private static final int SUCCESS_CODE = 200;
+    private static final int ERROR_CODE = 404;
 
     public static String getAPIToken() {
         return System.getenv(TOKEN);
@@ -256,12 +257,37 @@ public class MongoGradeDataBase implements GradeDataBase {
                 .addHeader(CONTENT_TYPE, APPLICATION_JSON)
                 .build();
 
-        final Response response;
-        final JSONObject responseBody;
+        try {
+            final Response response = client.newCall(request).execute();
+            final JSONObject responseBody = new JSONObject(response.body().string());
 
+            if (responseBody.getInt(STATUS_CODE) == SUCCESS_CODE) {
+                final JSONObject teamInfo = responseBody.getJSONObject("team");
+                final String name = teamInfo.getString("name");
+                final JSONArray membersArray = teamInfo.getJSONArray("members");
+                final String[] members = new String[membersArray.length()];
+                for (int i = 0; i < membersArray.length(); i++) {
+                    members[i] = membersArray.getString(i);
+                }
+                return Team.builder()
+                        .name(name)
+                        .members(members)
+                        .build();
+
+            }
+            else if (responseBody.getInt(STATUS_CODE) == ERROR_CODE) {
+                throw new RuntimeException(responseBody.getString(MESSAGE));
+
+            }
+            else {
+                throw new RuntimeException(responseBody.getString(MESSAGE));
+            }
+        }
+        catch (IOException | JSONException event) {
+            throw new RuntimeException(event);
+        }
         // TODO Task 3b: Implement the logic to get the team information
         // HINT: Look at the formTeam method to get an idea on how to parse the response
 
-        return null;
     }
 }
